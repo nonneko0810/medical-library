@@ -1,0 +1,4 @@
+firebase-config.js
+serviceAccountKey.json
+node_modules/
+.DS_Store
