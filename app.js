@@ -18,7 +18,7 @@ var THEME_KEY  = 'ml-theme';
 var CATEGORIES   = [];   // Firebase から再構築
 var sectionsData = {};   // {sectionId: {...}}
 var itemsData    = {};   // {slug: {...}}
-var data         = {};   // SM-2 学習進捗（localStorage）
+var data         = {};   // SM-2 学習進捗（Realtime Database / インメモリ）
 
 // ── Firebase ──
 var db   = null;
@@ -27,6 +27,10 @@ var auth = null;
 // ── 認証状態 ──
 var currentUser = null;
 var isAdmin     = false;
+
+// ── 学習進捗リスナー解除用 ──
+var progressRef      = null;
+var progressListener = null;
 
 // ── UI 状態 ──
 var currentTab     = 'area';
@@ -41,13 +45,73 @@ var sm_stage = 1;
 var savedOpenSecs = [];
 
 // ══════════════════════════════════════
-//  LocalStorage（SM-2 学習データのみ）
+//  学習進捗の読み込み / 保存（Realtime Database）
 // ══════════════════════════════════════
-function loadData() {
+
+// localStorage から旧データを読む（移行用）
+function loadDataFromLocal() {
   try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch(e) { return {}; }
 }
+
+// 単一アイテムの進捗を Realtime Database に保存
+function saveProgressItem(slug, record) {
+  if (!currentUser || !db) return;
+  db.ref('userProgress/' + currentUser.uid + '/' + slug).set(record, function(err) {
+    if (err) {
+      console.error('学習進捗の保存に失敗:', err);
+      showToast('進捗の保存に失敗しました');
+    }
+  });
+}
+
+// 単一アイテムの進捗を Realtime Database から削除
+function removeProgressItem(slug) {
+  if (!currentUser || !db) return;
+  db.ref('userProgress/' + currentUser.uid + '/' + slug).remove();
+}
+
+// ログイン時: userProgress/{uid} を購読して data に反映
+function subscribeProgress(uid) {
+  unsubscribeProgress(); // 既存リスナーを解除
+  progressRef = db.ref('userProgress/' + uid);
+  progressListener = progressRef.on('value', function(snap) {
+    data = snap.val() || {};
+    rebuildAndRender();
+  }, function(err) {
+    console.error('学習進捗の読み込みに失敗:', err);
+    data = {};
+    rebuildAndRender();
+  });
+}
+
+// ログアウト時: リスナー解除 & data クリア
+function unsubscribeProgress() {
+  if (progressRef && progressListener) {
+    progressRef.off('value', progressListener);
+  }
+  progressRef = null;
+  progressListener = null;
+}
+
+// ログイン後、DB に進捗が無ければ localStorage から一度だけ移行
+function migrateLocalIfNeeded(uid) {
+  db.ref('userProgress/' + uid).once('value', function(snap) {
+    if (snap.exists()) return; // 既にデータあり → 何もしない
+    var local = loadDataFromLocal();
+    if (!local || Object.keys(local).length === 0) return;
+    db.ref('userProgress/' + uid).set(local, function(err) {
+      if (err) {
+        console.error('localStorage 移行失敗:', err);
+      } else {
+        showToast('既存の学習記録を同期しました');
+      }
+    });
+  });
+}
+
+// 後方互換: saveData は何もしない（呼び出し元が残っていても安全）
 function saveData(d) {
-  try { localStorage.setItem(STORE_KEY, JSON.stringify(d)); } catch(e) {}
+  // no-op: 進捗は saveProgressItem() で個別保存
 }
 
 // ══════════════════════════════════════
@@ -91,7 +155,7 @@ function daysUntil(dateStr) {
 //  Firebase 初期化
 // ══════════════════════════════════════
 function initApp() {
-  data = loadData();
+  data = {}; // 学習進捗はログイン後に Realtime Database から取得
 
   // Firebase 設定チェック
   if (typeof firebase === 'undefined' || typeof firebaseConfig === 'undefined') {
@@ -193,10 +257,14 @@ function rebuildAndRender() {
 function handleAuthStateChanged(user) {
   currentUser = user;
   if (user && db) {
+    // 管理者チェック
     db.ref('admins/' + user.uid).once('value', function(snap) {
       isAdmin = snap.val() === true;
       updateAdminUI();
     });
+    // 学習進捗を購読 & localStorage 移行
+    migrateLocalIfNeeded(user.uid);
+    subscribeProgress(user.uid);
   } else {
     isAdmin = false;
     // 編集モードを解除
@@ -204,6 +272,10 @@ function handleAuthStateChanged(user) {
       editMode = false;
       document.body.classList.remove('edit-mode');
     }
+    // 進捗リスナー解除 & データクリア
+    unsubscribeProgress();
+    data = {};
+    rebuildAndRender();
     updateAdminUI();
   }
 }
@@ -632,9 +704,14 @@ function selScore(n) {
 
 function saveStudy() {
   if (!studyTarget) return;
+  if (!currentUser) {
+    showToast('学習記録の同期にはログインが必要です');
+    closeModal('study-modal');
+    return;
+  }
   var old = data[studyTarget] || { ef: 2.5, interval: 0, reps: 0 };
   var result = sm2(old, sm_score);
-  data[studyTarget] = {
+  var record = {
     ef: result.ef,
     interval: result.interval,
     reps: result.reps,
@@ -643,16 +720,21 @@ function saveStudy() {
     lastScore: sm_score,
     lastStudied: new Date().toISOString().slice(0, 10)
   };
-  saveData(data);
+  data[studyTarget] = record;
+  saveProgressItem(studyTarget, record);
   closeModal('study-modal');
-  showToast('記録しました！次回: ' + data[studyTarget].nextReview);
+  showToast('記録しました！次回: ' + record.nextReview);
   renderAllAndRestore(savedOpenSecs);
 }
 
 function quickScore(slug, score) {
+  if (!currentUser) {
+    showToast('学習記録の同期にはログインが必要です');
+    return;
+  }
   var old = data[slug] || { ef: 2.5, interval: 0, reps: 0, stage: 0 };
   var result = sm2(old, score);
-  data[slug] = {
+  var record = {
     ef: result.ef,
     interval: result.interval,
     reps: result.reps,
@@ -661,7 +743,8 @@ function quickScore(slug, score) {
     stage: Math.max(old.stage || 0, 1),
     lastStudied: new Date().toISOString().slice(0, 10)
   };
-  saveData(data);
+  data[slug] = record;
+  saveProgressItem(slug, record);
 
   var openSecs = [];
   document.querySelectorAll('#main-content .cat-section').forEach(function(el) {
@@ -731,9 +814,9 @@ function deleteItem(slug) {
 
   db.ref('items/' + slug).remove(function(err) {
     if (err) { showToast('エラー: ' + err.message); return; }
-    // 学習データもローカルから削除
+    // 学習データも Realtime Database から削除
     delete data[slug];
-    saveData(data);
+    removeProgressItem(slug);
     showToast('削除しました');
   });
 }
@@ -846,13 +929,16 @@ function deleteSection(secId, secName) {
   var updates = {};
   updates['sections/' + secId] = null;
   // 配下のアイテムも削除
+  var deletedSlugs = [];
   Object.keys(itemsData).forEach(function(k) {
     if (itemsData[k].sectionId === secId) {
       updates['items/' + k] = null;
       delete data[k];
+      deletedSlugs.push(k);
     }
   });
-  saveData(data);
+  // 学習進捗も Realtime Database から削除
+  deletedSlugs.forEach(function(slug) { removeProgressItem(slug); });
 
   db.ref().update(updates, function(err) {
     if (err) { showToast('エラー: ' + err.message); return; }
