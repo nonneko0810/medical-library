@@ -604,12 +604,18 @@ function renderAll() {
   if (si) q = si.value.trim().toLowerCase();
 
   var html = '';
+  var navHtml = '';
   CATEGORIES.forEach(function(cat) {
     if (currentTab !== 'all' && cat.tab !== currentTab) return;
     cat.sections.forEach(function(sec) {
       html += renderSection(sec, q);
+      navHtml += '<button class="snav-btn" onclick="scrollToSection(\'' + esc(sec.id) + '\')">'
+        + esc(sec.name) + '</button>';
     });
   });
+
+  var sn = document.getElementById('section-nav');
+  if (sn) sn.innerHTML = navHtml;
 
   if (!html) html = '<div class="loading-msg">該当するアイテムが見つかりませんでした</div>';
 
@@ -621,6 +627,13 @@ function renderAll() {
 
   var mc = document.getElementById('main-content');
   if (mc) mc.innerHTML = html;
+}
+
+function scrollToSection(secId) {
+  var el = document.getElementById('sec-' + secId);
+  if (!el) return;
+  var offset = el.getBoundingClientRect().top + window.scrollY;
+  window.scrollTo({top: offset, behavior: 'smooth'});
 }
 
 // ══════════════════════════════════════

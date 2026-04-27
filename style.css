@@ -153,6 +153,11 @@ body{background:var(--bg);color:var(--text);min-height:100vh;transition:backgrou
 #search-input:focus{border-color:var(--a1)}
 #search-input::placeholder{color:var(--text3)}
 
+/* ── Section quick-jump nav ── */
+.section-nav{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:1rem}
+.snav-btn{padding:4px 10px;border-radius:20px;border:1px solid var(--border2);background:var(--card);color:var(--text2);font-size:11px;cursor:pointer;white-space:nowrap;transition:background .15s,color .15s,border-color .15s}
+.snav-btn:hover{background:var(--bg3);color:var(--text);border-color:var(--border3)}
+
 /* ── Category ── */
 .cat-section{margin-bottom:7px;border:1px solid var(--border);border-radius:14px;overflow:hidden}
 .cat-hdr{display:flex;align-items:center;padding:10px 13px;cursor:pointer;background:var(--card);user-select:none;gap:9px}
