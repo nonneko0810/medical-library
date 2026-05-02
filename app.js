@@ -928,6 +928,16 @@ function saveImg() {
     return;
   }
 
+  var ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+  if (ALLOWED_TYPES.indexOf(file.type) === -1) {
+    showToast('対応形式: JPEG / PNG / WebP / GIF のみ');
+    return;
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    showToast('5MB 以下の画像を選択してください（現在: ' + (file.size / 1024 / 1024).toFixed(1) + 'MB）');
+    return;
+  }
+
   var progress = document.getElementById('img-upload-progress');
   progress.textContent = 'アップロード中...';
   progress.classList.add('show');
