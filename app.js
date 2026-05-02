@@ -21,8 +21,9 @@ var itemsData    = {};   // {slug: {...}}
 var data         = {};   // SM-2 学習進捗（Realtime Database / インメモリ）
 
 // ── Firebase ──
-var db   = null;
-var auth = null;
+var db      = null;
+var auth    = null;
+var storage = null;
 
 // ── 認証状態 ──
 var currentUser = null;
@@ -40,6 +41,7 @@ var addTargetSec   = null;
 var urlTargetSlug  = null;
 var secEditTargetId = null;
 var secAddTargetTab = null;
+var imgTargetSlug   = null;
 var sm_score = 3;
 var sm_stage = 1;
 var savedOpenSecs = [];
@@ -167,8 +169,9 @@ function initApp() {
   }
 
   firebase.initializeApp(firebaseConfig);
-  db   = firebase.database();
-  auth = firebase.auth();
+  db      = firebase.database();
+  auth    = firebase.auth();
+  storage = firebase.storage();
 
   // 認証状態の監視
   auth.onAuthStateChanged(handleAuthStateChanged);
@@ -224,7 +227,9 @@ function rebuildCategories() {
       url: it.url || null,
       linkName: it.linkName || it.name || slug,
       sectionId: it.sectionId || '',
-      sortOrder: it.sortOrder || 0
+      sortOrder: it.sortOrder || 0,
+      imageUrl: it.imageUrl || null,
+      imageCaption: it.imageCaption || null
     };
   });
   itemList.sort(function(a, b) { return a.sortOrder - b.sortOrder; });
@@ -237,7 +242,9 @@ function rebuildCategories() {
             slug: item.slug,
             name: item.name,
             url: item.url,
-            linkName: item.linkName
+            linkName: item.linkName,
+            imageUrl: item.imageUrl,
+            imageCaption: item.imageCaption
           });
         }
       });
@@ -547,10 +554,18 @@ function renderItem(item, sec) {
     ? '<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>'
     : '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>';
 
-  var editRow = '<div class="edit-actions"><button class="edit-url" onclick="openUrlModal(\'' + esc(item.slug) + '\')">URLを変更</button><button class="edit-del" onclick="deleteItem(\'' + esc(item.slug) + '\')">削除</button></div>';
+  var editRow = '<div class="edit-actions"><button class="edit-url" onclick="openUrlModal(\'' + esc(item.slug) + '\')">URLを変更</button><button class="edit-img" onclick="openImgModal(\'' + esc(item.slug) + '\')">画像</button><button class="edit-del" onclick="deleteItem(\'' + esc(item.slug) + '\')">削除</button></div>';
+
+  var altText = (item.imageCaption || item.name || '').replace(/"/g, '&quot;');
+  var thumbHtml = item.imageUrl
+    ? '<div class="item-thumb-wrap"><a href="' + item.imageUrl + '" target="_blank" rel="noopener"><img class="item-thumb" src="' + item.imageUrl + '" alt="' + altText + '" loading="lazy"></a>'
+      + (item.imageCaption ? '<div class="item-caption">' + item.imageCaption + '</div>' : '')
+      + '</div>'
+    : '';
 
   return '<div class="item-card' + (untouched ? ' untouched' : '') + '" id="card-' + item.slug + '">'
     + '<span class="item-name">' + item.name + '</span>'
+    + thumbHtml
     + linkRow
     + '<div class="item-foot"><span class="badge ' + stageCls(stage) + '">' + stageLabel(stage) + '</span>' + nextText + '</div>'
     + '<div class="item-actions"><button class="study-btn" onclick="openStudyModal(\'' + esc(item.slug) + '\',\'' + esc(item.name) + '\')">' + studyBtnIcon + studyBtnLabel + '</button>' + renderStars(item.slug) + '</div>'
@@ -825,11 +840,13 @@ function deleteItem(slug) {
 
   if (!confirm('「' + itemName + '」を削除しますか？')) return;
 
+  var imagePath = itemsData[slug] && itemsData[slug].imagePath;
+
   db.ref('items/' + slug).remove(function(err) {
     if (err) { showToast('エラー: ' + err.message); return; }
-    // 学習データも Realtime Database から削除
     delete data[slug];
     removeProgressItem(slug);
+    if (imagePath && storage) storage.ref(imagePath).delete().catch(function(){});
     showToast('削除しました');
   });
 }
@@ -866,6 +883,86 @@ function clearUrl() {
     if (err) { showToast('エラー: ' + err.message); return; }
     closeModal('url-modal');
     showToast('リンクを削除しました');
+  });
+}
+
+// ══════════════════════════════════════
+//  画像 CRUD（Firebase Storage）
+// ══════════════════════════════════════
+function openImgModal(slug) {
+  if (!isAdmin) return;
+  imgTargetSlug = slug;
+  var item = itemsData[slug];
+  document.getElementById('img-modal-title').textContent = (item ? item.name : slug) + ' — 画像';
+  var preview   = document.getElementById('img-preview');
+  var noPreview = document.getElementById('img-no-preview');
+  if (item && item.imageUrl) {
+    preview.src = item.imageUrl;
+    preview.style.display = 'block';
+    noPreview.style.display = 'none';
+  } else {
+    preview.src = '';
+    preview.style.display = 'none';
+    noPreview.style.display = 'flex';
+  }
+  document.getElementById('img-caption-input').value = (item && item.imageCaption) ? item.imageCaption : '';
+  document.getElementById('img-file-input').value = '';
+  document.getElementById('img-upload-progress').classList.remove('show');
+  document.getElementById('img-save-btn').disabled = false;
+  document.getElementById('img-delete-btn').style.display = (item && item.imageUrl) ? '' : 'none';
+  openModalById('img-modal');
+}
+
+function saveImg() {
+  var file    = document.getElementById('img-file-input').files[0];
+  var caption = document.getElementById('img-caption-input').value.trim();
+  var item    = itemsData[imgTargetSlug];
+
+  if (!file) {
+    if (!item || !item.imageUrl) { closeModal('img-modal'); return; }
+    db.ref('items/' + imgTargetSlug).update({ imageCaption: caption || null, updatedAt: Date.now() }, function(err) {
+      if (err) { showToast('エラー: ' + err.message); return; }
+      closeModal('img-modal');
+      showToast('キャプションを更新しました');
+    });
+    return;
+  }
+
+  var progress = document.getElementById('img-upload-progress');
+  progress.textContent = 'アップロード中...';
+  progress.classList.add('show');
+  document.getElementById('img-save-btn').disabled = true;
+
+  var ext      = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  var path     = 'item-images/' + imgTargetSlug + '/' + Date.now() + '.' + ext;
+  var oldPath  = item && item.imagePath;
+
+  storage.ref(path).put(file)
+    .then(function(snap) { return snap.ref.getDownloadURL(); })
+    .then(function(url) {
+      var updates = { imageUrl: url, imagePath: path, imageCaption: caption || null, updatedAt: Date.now() };
+      return db.ref('items/' + imgTargetSlug).update(updates).then(function() {
+        if (oldPath && oldPath !== path) storage.ref(oldPath).delete().catch(function(){});
+      });
+    })
+    .then(function() { closeModal('img-modal'); showToast('画像を保存しました'); })
+    .catch(function(err) {
+      progress.textContent = 'エラー: ' + (err.message || err);
+      document.getElementById('img-save-btn').disabled = false;
+    });
+}
+
+function deleteImg() {
+  if (!confirm('この画像を削除しますか？')) return;
+  var item    = itemsData[imgTargetSlug];
+  var oldPath = item && item.imagePath;
+  var updates = { imageUrl: null, imagePath: null, imageCaption: null, updatedAt: Date.now() };
+
+  db.ref('items/' + imgTargetSlug).update(updates, function(err) {
+    if (err) { showToast('エラー: ' + err.message); return; }
+    if (oldPath && storage) storage.ref(oldPath).delete().catch(function(){});
+    closeModal('img-modal');
+    showToast('画像を削除しました');
   });
 }
 
@@ -1135,7 +1232,7 @@ function exportData() {
 // ══════════════════════════════════════
 //  モーダルヘルパー
 // ══════════════════════════════════════
-var ALL_MODALS = ['study-modal','add-modal','url-modal','sec-add-modal','sec-edit-modal','stat-detail-modal','login-modal'];
+var ALL_MODALS = ['study-modal','add-modal','url-modal','sec-add-modal','sec-edit-modal','stat-detail-modal','login-modal','img-modal'];
 
 function closeModal(id) {
   var el = document.getElementById(id);

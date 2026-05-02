@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>medical-library Firebase 移行フロー</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Hiragino Sans', 'Yu Gothic', system-ui, sans-serif;
+      background: #f0f4f8;
+      color: #2d3748;
+      padding: 24px;
+    }
+    h1 {
+      text-align: center;
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: #1a202c;
+    }
+    .subtitle {
+      text-align: center;
+      font-size: 0.85rem;
+      color: #718096;
+      margin-bottom: 28px;
+    }
+
+    /* ===== LEGEND ===== */
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: center;
+      margin-bottom: 28px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.78rem;
+      color: #4a5568;
+    }
+    .legend-dot {
+      width: 14px; height: 14px; border-radius: 3px;
+    }
+
+    /* ===== TWO COLUMN LAYOUT ===== */
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    /* ===== PANEL ===== */
+    .panel {
+      background: white;
+      border-radius: 14px;
+      padding: 20px 20px 24px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+    .panel-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #4a5568;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #e2e8f0;
+    }
+
+    /* ===== STEP FLOW ===== */
+    .step-flow {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+    .step-block {
+      position: relative;
+    }
+    .step-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .step-badge {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem; font-weight: 700; color: white;
+      flex-shrink: 0;
+    }
+    .step-title {
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: #2d3748;
+    }
+    .step-tasks {
+      margin-left: 38px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      margin-bottom: 4px;
+    }
+    .task-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #f7fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 5px 10px;
+      font-size: 0.8rem;
+      color: #4a5568;
+    }
+    .task-pill .dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .arrow-down {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 28px;
+      margin-left: 14px;
+    }
+    .arrow-down svg {
+      display: block;
+    }
+
+    /* step colors */
+    .s1 { background: #4299e1; }
+    .s2 { background: #9f7aea; }
+    .s3 { background: #48bb78; }
+    .s4 { background: #f6ad55; }
+
+    .dot-s1 { background: #4299e1; }
+    .dot-s2 { background: #9f7aea; }
+    .dot-s3 { background: #48bb78; }
+    .dot-s4 { background: #f6ad55; }
+
+    /* ===== ARCHITECTURE ===== */
+    .arch-svg-wrap {
+      width: 100%;
+      overflow: visible;
+    }
+
+    /* ===== DATA STRUCTURE ===== */
+    .data-section { margin-bottom: 16px; }
+    .data-section h3 {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #718096;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 8px;
+    }
+    .data-fields {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .field-chip {
+      background: #ebf8ff;
+      border: 1px solid #bee3f8;
+      border-radius: 5px;
+      padding: 3px 9px;
+      font-size: 0.77rem;
+      color: #2b6cb0;
+      font-family: monospace;
+    }
+    .field-chip.optional {
+      background: #f0fff4;
+      border-color: #c6f6d5;
+      color: #276749;
+    }
+
+    /* ===== RULES CARD ===== */
+    .rules-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      margin-bottom: 7px;
+      font-size: 0.82rem;
+    }
+    .rules-row.admin { background: #fff5f5; }
+    .rules-row.guest { background: #f0fff4; }
+    .rules-row.blocked { background: #fffff0; }
+    .rules-icon {
+      font-size: 1.1rem;
+      width: 22px; text-align: center;
+    }
+    .rules-label { font-weight: 700; min-width: 80px; }
+    .rules-desc { color: #718096; }
+
+    /* ===== AVOID / REQUIRED ===== */
+    .checklist {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 0.8rem;
+      line-height: 1.4;
+    }
+    .check-icon { flex-shrink: 0; font-size: 0.9rem; }
+
+    /* ===== FILE TREE ===== */
+    .file-tree {
+      font-family: monospace;
+      font-size: 0.8rem;
+      background: #1a202c;
+      color: #e2e8f0;
+      border-radius: 8px;
+      padding: 14px 16px;
+      line-height: 1.8;
+    }
+    .ft-dir { color: #63b3ed; }
+    .ft-html { color: #68d391; }
+    .ft-js { color: #f6ad55; }
+    .ft-css { color: #fc8181; }
+    .ft-md { color: #b794f4; }
+    .ft-ex { color: #a0aec0; font-style: italic; }
+
+    /* responsive */
+    @media (max-width: 720px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<h1>🏥 medical-library — Firebase 移行 全体フロー</h1>
+<p class="subtitle">GitHub Pages + Firebase Realtime Database + Firebase Authentication 移行計画</p>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#4299e1"></div>Step 1: 現状分析</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#9f7aea"></div>Step 2: 設計提案</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#48bb78"></div>Step 3: 実装</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#f6ad55"></div>Step 4: ドキュメント整備</div>
+</div>
+
+<div class="layout">
+
+  <!-- ===== LEFT: Step Flow ===== -->
+  <div class="panel">
+    <div class="panel-title">📋 作業ステップフロー</div>
+    <div class="step-flow">
+
+      <!-- Step 0: 現状 -->
+      <div class="step-block">
+        <div style="background:#edf2f7;border-radius:8px;padding:10px 14px;margin-bottom:4px;display:flex;align-items:center;gap:10px;">
+          <span style="font-size:1.2rem;">📄</span>
+          <div>
+            <div style="font-size:0.85rem;font-weight:700;color:#4a5568;">現状: 静的 index.html</div>
+            <div style="font-size:0.76rem;color:#a0aec0;">JSの配列にデータを直書き、GitHub Pages で公開</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="arrow-down">
+        <svg width="20" height="24"><path d="M10,0 L10,16 M4,10 L10,18 L16,10" stroke="#a0aec0" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+
+      <!-- Step 1 -->
+      <div class="step-block">
+        <div class="step-header">
+          <div class="step-badge s1">1</div>
+          <div class="step-title">現状分析</div>
+        </div>
+        <div class="step-tasks">
+          <div class="task-pill"><span class="dot dot-s1"></span>index.html の構造を読む</div>
+          <div class="task-pill"><span class="dot dot-s1"></span>現在のデータ構造を整理する</div>
+          <div class="task-pill"><span class="dot dot-s1"></span>UI とデータロジックの分離ポイントを特定</div>
+        </div>
+      </div>
+
+      <div class="arrow-down">
+        <svg width="20" height="24"><path d="M10,0 L10,16 M4,10 L10,18 L16,10" stroke="#a0aec0" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="step-block">
+        <div class="step-header">
+          <div class="step-badge s2">2</div>
+          <div class="step-title">設計提案</div>
+        </div>
+        <div class="step-tasks">
+          <div class="task-pill"><span class="dot dot-s2"></span>Firebase RTDB のデータ構造案</div>
+          <div class="task-pill"><span class="dot dot-s2"></span>認証方式の提案</div>
+          <div class="task-pill"><span class="dot dot-s2"></span>編集UI の出し分け方法</div>
+          <div class="task-pill"><span class="dot dot-s2"></span>既存コードの分割・修正箇所</div>
+          <div class="task-pill"><span class="dot dot-s2"></span>ファイル構成変更案</div>
+          <div class="task-pill"><span class="dot dot-s2"></span>データ移行方法</div>
+          <div class="task-pill"><span class="dot dot-s2"></span>Security Rules 案</div>
+        </div>
+      </div>
+
+      <!-- Decision: 承認? -->
+      <div class="arrow-down">
+        <svg width="20" height="24"><path d="M10,0 L10,16 M4,10 L10,18 L16,10" stroke="#a0aec0" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div style="background:#fffbeb;border:1.5px solid #f6ad55;border-radius:8px;padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:1.1rem;">🔷</span>
+        <div style="font-size:0.82rem;color:#744210;font-weight:600;">設計内容を確認・承認</div>
+        <div style="font-size:0.76rem;color:#a0aec0;margin-left:auto;">不明点があれば仮定を明示</div>
+      </div>
+      <div class="arrow-down">
+        <svg width="20" height="24"><path d="M10,0 L10,16 M4,10 L10,18 L16,10" stroke="#a0aec0" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="step-block">
+        <div class="step-header">
+          <div class="step-badge s3">3</div>
+          <div class="step-title">実装</div>
+        </div>
+        <div class="step-tasks">
+          <div class="task-pill"><span class="dot dot-s3"></span>firebase-config.example.js 作成</div>
+          <div class="task-pill"><span class="dot dot-s3"></span>index.html → UI のみに整理</div>
+          <div class="task-pill"><span class="dot dot-s3"></span>style.css 分離</div>
+          <div class="task-pill"><span class="dot dot-s3"></span>app.js（RTDB CRUD + Auth）実装</div>
+          <div class="task-pill"><span class="dot dot-s3"></span>migrate-data.js（既存データ移行）</div>
+          <div class="task-pill"><span class="dot dot-s3"></span>管理者UI（追加・編集・削除ボタン）</div>
+          <div class="task-pill"><span class="dot dot-s3"></span>Security Rules 設定</div>
+        </div>
+      </div>
+
+      <div class="arrow-down">
+        <svg width="20" height="24"><path d="M10,0 L10,16 M4,10 L10,18 L16,10" stroke="#a0aec0" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+
+      <!-- Step 4 -->
+      <div class="step-block">
+        <div class="step-header">
+          <div class="step-badge s4">4</div>
+          <div class="step-title">ドキュメント整備</div>
+        </div>
+        <div class="step-tasks">
+          <div class="task-pill"><span class="dot dot-s4"></span>README.md 作成</div>
+          <div class="task-pill"><span class="dot dot-s4"></span>Firebase セットアップ手順</div>
+          <div class="task-pill"><span class="dot dot-s4"></span>変更差分のサマリー</div>
+        </div>
+      </div>
+
+      <div class="arrow-down">
+        <svg width="20" height="24"><path d="M10,0 L10,16 M4,10 L10,18 L16,10" stroke="#a0aec0" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+
+      <!-- 完了 -->
+      <div style="background:#f0fff4;border:1.5px solid #68d391;border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:1.2rem;">✅</span>
+        <div>
+          <div style="font-size:0.85rem;font-weight:700;color:#276749;">完成: GitHub Pages へ push & 公開</div>
+          <div style="font-size:0.76rem;color:#a0aec0;">管理者がページ上から直接 CRUD 可能な状態</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== RIGHT: Architecture + Data ===== -->
+  <div style="display:flex;flex-direction:column;gap:20px;">
+
+    <!-- Architecture -->
+    <div class="panel">
+      <div class="panel-title">🏗️ システムアーキテクチャ</div>
+      <svg viewBox="0 0 420 260" class="arch-svg-wrap" style="width:100%">
+        <defs>
+          <marker id="arr" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 Z" fill="#718096"/>
+          </marker>
+          <marker id="arr2" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 Z" fill="#4299e1"/>
+          </marker>
+        </defs>
+
+        <!-- GitHub Pages -->
+        <rect x="10" y="10" width="130" height="72" rx="10" fill="#ebf8ff" stroke="#90cdf4" stroke-width="1.5"/>
+        <text x="75" y="32" text-anchor="middle" font-size="11" font-weight="700" fill="#2b6cb0">GitHub Pages</text>
+        <text x="75" y="49" text-anchor="middle" font-size="9.5" fill="#4a5568">index.html</text>
+        <text x="75" y="62" text-anchor="middle" font-size="9.5" fill="#4a5568">style.css / app.js</text>
+        <text x="75" y="75" text-anchor="middle" font-size="9" fill="#a0aec0">静的フロント配信</text>
+
+        <!-- Browser -->
+        <rect x="160" y="85" width="100" height="52" rx="8" fill="#fff" stroke="#e2e8f0" stroke-width="1.5"/>
+        <text x="210" y="108" text-anchor="middle" font-size="11" font-weight="700" fill="#4a5568">🌐 ブラウザ</text>
+        <text x="210" y="124" text-anchor="middle" font-size="9" fill="#a0aec0">閲覧者 / 管理者</text>
+
+        <!-- Firebase Auth -->
+        <rect x="280" y="10" width="130" height="56" rx="10" fill="#fff5f5" stroke="#fc8181" stroke-width="1.5"/>
+        <text x="345" y="32" text-anchor="middle" font-size="11" font-weight="700" fill="#c53030">Firebase Auth</text>
+        <text x="345" y="48" text-anchor="middle" font-size="9.5" fill="#4a5568">管理者ログイン制御</text>
+        <text x="345" y="60" text-anchor="middle" font-size="9" fill="#a0aec0">Email / Password</text>
+
+        <!-- Firebase RTDB -->
+        <rect x="280" y="100" width="130" height="60" rx="10" fill="#f0fff4" stroke="#68d391" stroke-width="1.5"/>
+        <text x="345" y="122" text-anchor="middle" font-size="11" font-weight="700" fill="#276749">Firebase RTDB</text>
+        <text x="345" y="138" text-anchor="middle" font-size="9.5" fill="#4a5568">categories / items</text>
+        <text x="345" y="152" text-anchor="middle" font-size="9" fill="#a0aec0">リアルタイム同期</text>
+
+        <!-- Security Rules -->
+        <rect x="155" y="185" width="110" height="44" rx="8" fill="#fffff0" stroke="#f6e05e" stroke-width="1.5"/>
+        <text x="210" y="204" text-anchor="middle" font-size="10" font-weight="700" fill="#744210">Security Rules</text>
+        <text x="210" y="220" text-anchor="middle" font-size="8.5" fill="#4a5568">書込: 認証済のみ / 読取: 全員</text>
+
+        <!-- Arrows: GitHub Pages → Browser -->
+        <path d="M140,45 Q150,45 160,111" stroke="#718096" stroke-width="1.5" fill="none" marker-end="url(#arr)" stroke-dasharray="4,3"/>
+        <text x="142" y="80" font-size="8" fill="#a0aec0">配信</text>
+
+        <!-- Arrows: Browser ↔ Firebase Auth -->
+        <path d="M260,97 Q270,65 280,42" stroke="#fc8181" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+        <text x="265" y="73" font-size="8" fill="#fc8181">認証</text>
+        <path d="M280,38 Q270,55 260,100" stroke="#fc8181" stroke-width="1.5" fill="none" stroke-dasharray="3,3"/>
+
+        <!-- Arrows: Browser ↔ RTDB -->
+        <path d="M260,111 L280,122" stroke="#48bb78" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+        <text x="257" y="108" font-size="8" fill="#48bb78">読取</text>
+        <path d="M280,133 L260,125" stroke="#48bb78" stroke-width="1.5" fill="none" stroke-dasharray="3,3" marker-end="url(#arr)"/>
+        <text x="255" y="140" font-size="8" fill="#276749">書込(要Auth)</text>
+
+        <!-- RTDB → Security Rules -->
+        <path d="M310,160 Q290,172 265,185" stroke="#f6ad55" stroke-width="1.5" fill="none" marker-end="url(#arr)" stroke-dasharray="3,3"/>
+
+        <!-- Legend bottom -->
+        <text x="10" y="220" font-size="8.5" fill="#a0aec0">──── 実線: 通常通信　- - - 破線: 参照/依存</text>
+      </svg>
+    </div>
+
+    <!-- File structure -->
+    <div class="panel">
+      <div class="panel-title">📁 ファイル構成（移行後）</div>
+      <div class="file-tree">
+        <span class="ft-dir">medical-library/</span><br>
+        &nbsp;├─ <span class="ft-html">index.html</span> <span class="ft-ex"># UIのみ（データロジック分離）</span><br>
+        &nbsp;├─ <span class="ft-css">style.css</span> <span class="ft-ex"># スタイル（既存を移動）</span><br>
+        &nbsp;├─ <span class="ft-js">app.js</span> <span class="ft-ex"># CRUD + Auth ロジック</span><br>
+        &nbsp;├─ <span class="ft-js">firebase-config.example.js</span> <span class="ft-ex"># 設定テンプレ</span><br>
+        &nbsp;├─ <span class="ft-js">migrate-data.js</span> <span class="ft-ex"># 既存データ移行スクリプト</span><br>
+        &nbsp;└─ <span class="ft-md">README.md</span> <span class="ft-ex"># セットアップ手順</span>
+      </div>
+    </div>
+
+    <!-- Data fields -->
+    <div class="panel">
+      <div class="panel-title">🗄️ データ構造（RTDB）</div>
+      <div class="data-section">
+        <h3>items（必須フィールド）</h3>
+        <div class="data-fields">
+          <span class="field-chip">id</span>
+          <span class="field-chip">title</span>
+          <span class="field-chip">url</span>
+          <span class="field-chip">category</span>
+          <span class="field-chip">note</span>
+          <span class="field-chip">sortOrder</span>
+          <span class="field-chip">createdAt</span>
+          <span class="field-chip">updatedAt</span>
+        </div>
+      </div>
+      <div class="data-section">
+        <h3>items（任意フィールド）</h3>
+        <div class="data-fields">
+          <span class="field-chip optional">tags</span>
+          <span class="field-chip optional">favorite</span>
+          <span class="field-chip optional">archived</span>
+        </div>
+      </div>
+      <div class="data-section" style="margin-bottom:0">
+        <h3>categories</h3>
+        <div class="data-fields">
+          <span class="field-chip">name</span>
+          <span class="field-chip">sortOrder</span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- right column -->
+
+</div><!-- layout -->
+
+<!-- Bottom 2-col: Auth rules + 制約 -->
+<div style="max-width:1100px;margin:20px auto 0;display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+
+  <!-- Auth rules -->
+  <div class="panel">
+    <div class="panel-title">🔐 権限・認証フロー</div>
+    <div class="rules-row guest">
+      <div class="rules-icon">👁️</div>
+      <div class="rules-label" style="color:#276749;">一般閲覧者</div>
+      <div class="rules-desc">ログイン不要・読み取りのみ・編集UIは非表示</div>
+    </div>
+    <div class="rules-row admin">
+      <div class="rules-icon">🔑</div>
+      <div class="rules-label" style="color:#c53030;">管理者</div>
+      <div class="rules-desc">Email/Password でログイン → 追加・編集・削除UI が出現</div>
+    </div>
+    <div class="rules-row blocked">
+      <div class="rules-icon">🛡️</div>
+      <div class="rules-label" style="color:#744210;">Security Rules</div>
+      <div class="rules-desc">書込: <code>auth != null</code>のみ許可 / テストモードは使用禁止</div>
+    </div>
+  </div>
+
+  <!-- 絶対避けること -->
+  <div class="panel">
+    <div class="panel-title">⚠️ 制約事項</div>
+    <div class="checklist">
+      <div class="check-item"><span class="check-icon">🚫</span><span>React / Vue / Next.js への全面リプレイス</span></div>
+      <div class="check-item"><span class="check-icon">🚫</span><span>GitHub Pages をやめる提案</span></div>
+      <div class="check-item"><span class="check-icon">🚫</span><span>Firebase テストモードの本番運用</span></div>
+      <div class="check-item"><span class="check-icon">🚫</span><span>既存UIを無視した全面デザイン変更</span></div>
+      <div class="check-item"><span class="check-icon">🚫</span><span>秘密情報のリポジトリへのハードコード</span></div>
+      <div class="check-item"><span class="check-icon">✅</span><span>既存コードを活かしながら段階的に移行</span></div>
+      <div class="check-item"><span class="check-icon">✅</span><span>HTML / CSS / JS のみ・フレームワーク不使用</span></div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

@@ -13,7 +13,7 @@
  */
 
 const admin = require('firebase-admin');
-const serviceAccount = require('./serviceAccountKey.json');
+const serviceAccount = require('../serviceAccountKey.json');
 
 const DATABASE_URL = 'https://medicallibrary-4e1c7-default-rtdb.asia-southeast1.firebasedatabase.app';
 

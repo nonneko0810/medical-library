@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>医学知識ライブラリ</title>
-<link rel="stylesheet" href="style.css?v=2">
+<link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
 <div class="app" id="app">
@@ -295,16 +295,51 @@
   </div>
 </div>
 
+<!-- 画像編集モーダル -->
+<div class="modal-wrap" id="img-modal">
+  <div class="overlay" onclick="if(event.target===this)closeModal('img-modal')">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title" id="img-modal-title">画像を編集</div>
+        <button class="modal-close" onclick="closeModal('img-modal')"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+      <div class="img-preview-wrap">
+        <img class="img-preview" id="img-preview" src="" alt="プレビュー" style="display:none">
+        <div class="img-no-preview" id="img-no-preview">画像未登録</div>
+      </div>
+      <div class="m-row">
+        <label class="m-lbl">画像ファイル</label>
+        <input class="m-input" id="img-file-input" type="file" accept="image/*">
+      </div>
+      <div class="m-row">
+        <label class="m-lbl">キャプション（任意）</label>
+        <input class="m-input" id="img-caption-input" placeholder="例: 組織像の模式図">
+      </div>
+      <div class="img-upload-progress" id="img-upload-progress"></div>
+      <div class="m-actions">
+        <button class="btn-cancel" onclick="closeModal('img-modal')">キャンセル</button>
+        <button class="btn-primary" id="img-save-btn" onclick="saveImg()">保存する</button>
+      </div>
+      <div class="m-divider"></div>
+      <button class="m-danger-btn" id="img-delete-btn" onclick="deleteImg()" style="display:none">
+        <svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+        画像を削除する
+      </button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <!-- Firebase SDK（compat版） -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <!-- Firebase 設定（firebase-config.js を作成してください） -->
 <script src="firebase-config.js" onerror="console.warn('firebase-config.js が見つかりません')"></script>
 <!-- アプリケーションロジック -->
-<script src="app.js?v=2"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>
 
