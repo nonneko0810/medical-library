@@ -228,8 +228,7 @@ function rebuildCategories() {
       linkName: it.linkName || it.name || slug,
       sectionId: it.sectionId || '',
       sortOrder: it.sortOrder || 0,
-      imageUrl: it.imageUrl || null,
-      imageCaption: it.imageCaption || null
+      images: normalizeImages(it)
     };
   });
   itemList.sort(function(a, b) { return a.sortOrder - b.sortOrder; });
@@ -243,8 +242,7 @@ function rebuildCategories() {
             name: item.name,
             url: item.url,
             linkName: item.linkName,
-            imageUrl: item.imageUrl,
-            imageCaption: item.imageCaption
+            images: item.images
           });
         }
       });
@@ -556,12 +554,7 @@ function renderItem(item, sec) {
 
   var editRow = '<div class="edit-actions"><button class="edit-url" onclick="openUrlModal(\'' + esc(item.slug) + '\')">URLを変更</button><button class="edit-img" onclick="openImgModal(\'' + esc(item.slug) + '\')">画像</button><button class="edit-del" onclick="deleteItem(\'' + esc(item.slug) + '\')">削除</button></div>';
 
-  var altText = (item.imageCaption || item.name || '').replace(/"/g, '&quot;');
-  var thumbHtml = item.imageUrl
-    ? '<div class="item-thumb-wrap"><a href="' + item.imageUrl + '" target="_blank" rel="noopener"><img class="item-thumb" src="' + item.imageUrl + '" alt="' + altText + '" loading="lazy"></a>'
-      + (item.imageCaption ? '<div class="item-caption">' + item.imageCaption + '</div>' : '')
-      + '</div>'
-    : '';
+  var thumbHtml = renderItemThumbs(item.images);
 
   return '<div class="item-card' + (untouched ? ' untouched' : '') + '" id="card-' + item.slug + '">'
     + '<span class="item-name">' + item.name + '</span>'
@@ -840,13 +833,13 @@ function deleteItem(slug) {
 
   if (!confirm('「' + itemName + '」を削除しますか？')) return;
 
-  var imagePath = itemsData[slug] && itemsData[slug].imagePath;
+  var itemToDelete = itemsData[slug];
 
   db.ref('items/' + slug).remove(function(err) {
     if (err) { showToast('エラー: ' + err.message); return; }
     delete data[slug];
     removeProgressItem(slug);
-    if (imagePath && storage) storage.ref(imagePath).delete().catch(function(){});
+    deleteAllImgFiles(itemToDelete);
     showToast('削除しました');
   });
 }
@@ -887,92 +880,163 @@ function clearUrl() {
 }
 
 // ══════════════════════════════════════
+//  画像ヘルパー
+// ══════════════════════════════════════
+function normalizeImages(itemData) {
+  var imgs = [];
+  var raw = itemData && itemData.images;
+  if (raw && typeof raw === 'object') {
+    Object.keys(raw).forEach(function(id) {
+      if (raw[id] && raw[id].url) imgs.push(Object.assign({}, raw[id], {id: id}));
+    });
+    imgs.sort(function(a, b) {
+      var ao = a.order != null ? a.order : (a.createdAt || 0);
+      var bo = b.order != null ? b.order : (b.createdAt || 0);
+      return ao - bo;
+    });
+  }
+  if (imgs.length === 0 && itemData && itemData.imageUrl) {
+    imgs.push({id:'legacy', url:itemData.imageUrl, path:itemData.imagePath||null,
+               caption:itemData.imageCaption||null, order:0, createdAt:0});
+  }
+  return imgs;
+}
+
+function renderItemThumbs(images) {
+  if (!images || images.length === 0) return '';
+  var inner = images.map(function(img) {
+    var alt = (img.caption || '').replace(/"/g, '&quot;');
+    return '<div class="item-thumb-wrap">'
+      + '<a href="' + img.url + '" target="_blank" rel="noopener">'
+      + '<img class="item-thumb" src="' + img.url + '" alt="' + alt + '" loading="lazy"></a>'
+      + (img.caption ? '<div class="item-caption">' + img.caption + '</div>' : '')
+      + '</div>';
+  }).join('');
+  return '<div class="item-thumbs-row">' + inner + '</div>';
+}
+
+function deleteAllImgFiles(item) {
+  if (!item || !storage) return;
+  normalizeImages(item).forEach(function(img) {
+    if (img.path) storage.ref(img.path).delete().catch(function(){});
+  });
+}
+
+// ══════════════════════════════════════
 //  画像 CRUD（Firebase Storage）
 // ══════════════════════════════════════
 function openImgModal(slug) {
   if (!isAdmin) return;
   imgTargetSlug = slug;
   var item = itemsData[slug];
-  document.getElementById('img-modal-title').textContent = (item ? item.name : slug) + ' — 画像';
-  var preview   = document.getElementById('img-preview');
-  var noPreview = document.getElementById('img-no-preview');
-  if (item && item.imageUrl) {
-    preview.src = item.imageUrl;
-    preview.style.display = 'block';
-    noPreview.style.display = 'none';
-  } else {
-    preview.src = '';
-    preview.style.display = 'none';
-    noPreview.style.display = 'flex';
-  }
-  document.getElementById('img-caption-input').value = (item && item.imageCaption) ? item.imageCaption : '';
-  document.getElementById('img-file-input').value = '';
-  document.getElementById('img-upload-progress').classList.remove('show');
-  document.getElementById('img-save-btn').disabled = false;
-  document.getElementById('img-delete-btn').style.display = (item && item.imageUrl) ? '' : 'none';
+  document.getElementById('img-modal-title').textContent = (item ? item.name : slug) + ' — 画像管理';
+  refreshImgModal();
   openModalById('img-modal');
+}
+
+function refreshImgModal() {
+  var item = itemsData[imgTargetSlug];
+  var imgs = normalizeImages(item);
+  document.getElementById('img-count').textContent = imgs.length + ' / 5 枚';
+  document.getElementById('img-current-list').innerHTML = renderImgList(imgs);
+  var isFull = imgs.length >= 5;
+  document.getElementById('img-add-section').style.display = isFull ? 'none' : '';
+  document.getElementById('img-max-reached').style.display = isFull ? '' : 'none';
+  if (!isFull) {
+    document.getElementById('img-file-input').value = '';
+    document.getElementById('img-caption-input').value = '';
+    document.getElementById('img-upload-progress').classList.remove('show');
+    document.getElementById('img-save-btn').disabled = false;
+  }
+}
+
+function renderImgList(imgs) {
+  if (imgs.length === 0) return '<div class="img-list-empty">画像未登録</div>';
+  return imgs.map(function(img) {
+    var cap = (img.caption || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    var delBtn = '<button class="img-list-del" onclick="deleteImg(\'' + esc(img.id) + '\')" title="削除">'
+      + '<svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/>'
+      + '<path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg></button>';
+    return '<div class="img-list-item">'
+      + '<img class="img-list-thumb" src="' + img.url + '" loading="lazy">'
+      + '<div class="img-list-info">'
+      + (cap ? '<div class="img-list-caption">' + cap + '</div>'
+             : '<div class="img-list-no-caption">キャプションなし</div>')
+      + '</div>' + delBtn + '</div>';
+  }).join('');
+}
+
+function validateImgFile(file) {
+  var ALLOWED = ['image/jpeg','image/png','image/webp','image/gif'];
+  if (ALLOWED.indexOf(file.type) === -1) return '対応形式: JPEG / PNG / WebP / GIF のみ';
+  if (file.size > 5 * 1024 * 1024) {
+    return '5MB 以下の画像を選択してください（現在: ' + (file.size/1024/1024).toFixed(1) + 'MB）';
+  }
+  return null;
 }
 
 function saveImg() {
   var file    = document.getElementById('img-file-input').files[0];
   var caption = document.getElementById('img-caption-input').value.trim();
-  var item    = itemsData[imgTargetSlug];
+  var imgs    = normalizeImages(itemsData[imgTargetSlug]);
 
-  if (!file) {
-    if (!item || !item.imageUrl) { closeModal('img-modal'); return; }
-    db.ref('items/' + imgTargetSlug).update({ imageCaption: caption || null, updatedAt: Date.now() }, function(err) {
-      if (err) { showToast('エラー: ' + err.message); return; }
-      closeModal('img-modal');
-      showToast('キャプションを更新しました');
-    });
-    return;
-  }
-
-  var ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-  if (ALLOWED_TYPES.indexOf(file.type) === -1) {
-    showToast('対応形式: JPEG / PNG / WebP / GIF のみ');
-    return;
-  }
-  if (file.size > 5 * 1024 * 1024) {
-    showToast('5MB 以下の画像を選択してください（現在: ' + (file.size / 1024 / 1024).toFixed(1) + 'MB）');
-    return;
-  }
+  if (!file) { showToast('画像ファイルを選択してください'); return; }
+  if (imgs.length >= 5) { showToast('画像は最大5枚までです'); return; }
+  var err = validateImgFile(file);
+  if (err) { showToast(err); return; }
 
   var progress = document.getElementById('img-upload-progress');
   progress.textContent = 'アップロード中...';
   progress.classList.add('show');
   document.getElementById('img-save-btn').disabled = true;
+  uploadImgFile(file, caption, imgs.length);
+}
 
-  var ext      = (file.name.split('.').pop() || 'jpg').toLowerCase();
-  var path     = 'item-images/' + imgTargetSlug + '/' + Date.now() + '.' + ext;
-  var oldPath  = item && item.imagePath;
+function uploadImgFile(file, caption, order) {
+  var imageId = String(Date.now());
+  var ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  var path = 'item-images/' + imgTargetSlug + '/' + imageId + '.' + ext;
 
   storage.ref(path).put(file)
     .then(function(snap) { return snap.ref.getDownloadURL(); })
     .then(function(url) {
-      var updates = { imageUrl: url, imagePath: path, imageCaption: caption || null, updatedAt: Date.now() };
-      return db.ref('items/' + imgTargetSlug).update(updates).then(function() {
-        if (oldPath && oldPath !== path) storage.ref(oldPath).delete().catch(function(){});
+      return db.ref('items/' + imgTargetSlug + '/images/' + imageId).set({
+        url:url, path:path, caption:caption||null, order:order, createdAt:Number(imageId)
       });
     })
-    .then(function() { closeModal('img-modal'); showToast('画像を保存しました'); })
+    .then(function() { showToast('画像を追加しました'); refreshImgModal(); })
     .catch(function(err) {
+      var progress = document.getElementById('img-upload-progress');
       progress.textContent = 'エラー: ' + (err.message || err);
       document.getElementById('img-save-btn').disabled = false;
     });
 }
 
-function deleteImg() {
+function deleteImg(imageId) {
   if (!confirm('この画像を削除しますか？')) return;
-  var item    = itemsData[imgTargetSlug];
-  var oldPath = item && item.imagePath;
-  var updates = { imageUrl: null, imagePath: null, imageCaption: null, updatedAt: Date.now() };
+  var item = itemsData[imgTargetSlug];
 
-  db.ref('items/' + imgTargetSlug).update(updates, function(err) {
+  if (imageId === 'legacy') {
+    var legacyPath = item && item.imagePath;
+    db.ref('items/' + imgTargetSlug).update(
+      {imageUrl:null, imagePath:null, imageCaption:null, updatedAt:Date.now()},
+      function(err) {
+        if (err) { showToast('エラー: ' + err.message); return; }
+        if (legacyPath && storage) storage.ref(legacyPath).delete().catch(function(){});
+        showToast('画像を削除しました');
+        refreshImgModal();
+      }
+    );
+    return;
+  }
+
+  var imgData = item && item.images && item.images[imageId];
+  var imgPath = imgData && imgData.path;
+  db.ref('items/' + imgTargetSlug + '/images/' + imageId).remove(function(err) {
     if (err) { showToast('エラー: ' + err.message); return; }
-    if (oldPath && storage) storage.ref(oldPath).delete().catch(function(){});
-    closeModal('img-modal');
+    if (imgPath && storage) storage.ref(imgPath).delete().catch(function(){});
     showToast('画像を削除しました');
+    refreshImgModal();
   });
 }
 
