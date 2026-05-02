@@ -655,6 +655,15 @@ function toggleCat(hdr) {
   chev.classList.toggle('open', !open);
 }
 
+function closeAllCats() {
+  document.querySelectorAll('.cat-body.open').forEach(function(body) {
+    body.classList.remove('open');
+  });
+  document.querySelectorAll('.chev.open').forEach(function(chev) {
+    chev.classList.remove('open');
+  });
+}
+
 function switchTab(t, btn) {
   currentTab = t;
   document.querySelectorAll('.tab').forEach(function(b){ b.classList.remove('on'); });
