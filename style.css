@@ -142,7 +142,8 @@ body{background:var(--bg);color:var(--text);min-height:100vh;transition:backgrou
 .idp-study-btn:hover{border-color:#1a1a2e;background:#1a1a2e;color:#fff}
 
 /* ── Tabs ── */
-.tabs{display:flex;gap:2px;margin-bottom:1.1rem;background:var(--card);padding:3px;border-radius:9px;width:fit-content;border:1px solid var(--border)}
+.tabs-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.1rem}
+.tabs{display:flex;gap:2px;background:var(--card);padding:3px;border-radius:9px;width:fit-content;border:1px solid var(--border)}
 .tab{font-size:12px;padding:5px 15px;border:none;background:transparent;color:var(--text2);cursor:pointer;border-radius:6px}
 .tab.on{background:var(--bg3);color:var(--text);font-weight:500;border:1px solid var(--border2)}
 

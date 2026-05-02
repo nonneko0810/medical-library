@@ -94,11 +94,17 @@
 </div>
 
 <!-- Tabs -->
-<div class="tabs">
-  <button class="tab on" onclick="switchTab('area',this)">領域別</button>
-  <button class="tab" onclick="switchTab('cross',this)">横断テーマ</button>
-  <button class="tab" onclick="switchTab('exam',this)">検査</button>
-  <button class="tab" onclick="switchTab('all',this)">全て</button>
+<div class="tabs-row">
+  <div class="tabs">
+    <button class="tab on" onclick="switchTab('area',this)">領域別</button>
+    <button class="tab" onclick="switchTab('cross',this)">横断テーマ</button>
+    <button class="tab" onclick="switchTab('exam',this)">検査</button>
+    <button class="tab" onclick="switchTab('all',this)">全て</button>
+  </div>
+  <button class="ghost-btn" onclick="closeAllCats()">
+    <svg viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"/></svg>
+    <span>全て閉じる</span>
+  </button>
 </div>
 
 <!-- Search -->
