@@ -1346,6 +1346,16 @@ function showToast(msg) {
   toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 2500);
 }
 
+function scrollToTop() {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+window.addEventListener('scroll', function() {
+  var btn = document.getElementById('scroll-top-btn');
+  if (!btn) return;
+  btn.classList.toggle('visible', window.scrollY > 300);
+});
+
 // ══════════════════════════════════════
 //  初期化
 // ══════════════════════════════════════
