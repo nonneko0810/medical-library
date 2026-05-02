@@ -1350,16 +1350,15 @@ function scrollToTop() {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-var scrollTopBtn = document.getElementById('scroll-top-btn');
-window.addEventListener('scroll', function() {
-  if (!scrollTopBtn) return;
-  scrollTopBtn.classList.toggle('visible', window.scrollY > 300);
-});
-
 // ══════════════════════════════════════
 //  初期化
 // ══════════════════════════════════════
 document.addEventListener('DOMContentLoaded', function() {
+  var scrollTopBtn = document.getElementById('scroll-top-btn');
+  window.addEventListener('scroll', function() {
+    if (!scrollTopBtn) return;
+    scrollTopBtn.classList.toggle('visible', window.scrollY > 300);
+  });
   var areaTab = document.querySelector('.tab');
   if (areaTab) switchTab('area', areaTab);
   updateAdminUI();
