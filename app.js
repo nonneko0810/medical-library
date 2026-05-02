@@ -1350,10 +1350,10 @@ function scrollToTop() {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+var scrollTopBtn = document.getElementById('scroll-top-btn');
 window.addEventListener('scroll', function() {
-  var btn = document.getElementById('scroll-top-btn');
-  if (!btn) return;
-  btn.classList.toggle('visible', window.scrollY > 300);
+  if (!scrollTopBtn) return;
+  scrollTopBtn.classList.toggle('visible', window.scrollY > 300);
 });
 
 // ══════════════════════════════════════
