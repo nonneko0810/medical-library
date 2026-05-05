@@ -946,9 +946,9 @@ function openImgModal(slug) {
 function refreshImgModal() {
   var item = itemsData[imgTargetSlug];
   var imgs = normalizeImages(item);
-  document.getElementById('img-count').textContent = imgs.length + ' / 5 枚';
+  document.getElementById('img-count').textContent = imgs.length + ' / 10 枚';
   document.getElementById('img-current-list').innerHTML = renderImgList(imgs);
-  var isFull = imgs.length >= 5;
+  var isFull = imgs.length >= 10;
   document.getElementById('img-add-section').style.display = isFull ? 'none' : '';
   document.getElementById('img-max-reached').style.display = isFull ? '' : 'none';
   if (!isFull) {
@@ -990,7 +990,7 @@ function saveImg() {
   var imgs    = normalizeImages(itemsData[imgTargetSlug]);
 
   if (!file) { showToast('画像ファイルを選択してください'); return; }
-  if (imgs.length >= 5) { showToast('画像は最大5枚までです'); return; }
+  if (imgs.length >= 10) { showToast('画像は最大10枚までです'); return; }
   var err = validateImgFile(file);
   if (err) { showToast(err); return; }
 
