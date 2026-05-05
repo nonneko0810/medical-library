@@ -330,9 +330,16 @@ body.edit-mode .add-section-btn{display:flex}
 .img-list-del:hover{border-color:var(--danger);color:var(--danger)}
 .img-list-del svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2}
 .img-max-msg{font-size:12px;color:var(--text3);text-align:center;padding:10px 0}
-.img-upload-progress{font-size:12px;color:#555;margin-top:8px;padding:8px 12px;background:#f4f4f4;border-radius:8px;display:none}
+.img-upload-progress{font-size:12px;color:var(--text2);margin-top:8px;padding:8px 12px;background:var(--bg3);border-radius:8px;display:none}
 .img-upload-progress.show{display:block}
-.m-input[type="file"]{padding:10px 14px;cursor:pointer}
+.img-drop-zone{border:2px dashed var(--border2);border-radius:10px;padding:22px 16px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;margin:4px 0 8px}
+.img-drop-zone:hover{border-color:var(--a1);background:var(--bg3)}
+.img-drop-zone.drag-over{border-color:var(--a1);background:var(--sr-bg)}
+.img-drop-icon{width:28px;height:28px;stroke:var(--text3);fill:none;stroke-width:1.5;margin-bottom:6px}
+.img-drop-zone.drag-over .img-drop-icon{stroke:var(--a1)}
+.img-drop-text{font-size:13px;color:var(--text2);margin-bottom:3px}
+.img-drop-zone.drag-over .img-drop-text{color:var(--a1)}
+.img-drop-sub{font-size:11px;color:var(--text3)}
 
 #scroll-top-btn{position:fixed;bottom:24px;right:24px;width:40px;height:40px;border-radius:50%;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:18px;cursor:pointer;z-index:100;opacity:0;pointer-events:none;transition:opacity .2s;display:flex;align-items:center;justify-content:center}
 #scroll-top-btn.visible{opacity:1;pointer-events:auto}

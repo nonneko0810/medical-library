@@ -317,7 +317,12 @@
         <div class="m-divider"></div>
         <div class="m-row">
           <label class="m-lbl">新しい画像を追加</label>
-          <input class="m-input" id="img-file-input" type="file" accept="image/*">
+        </div>
+        <div class="img-drop-zone" id="img-drop-zone" onclick="document.getElementById('img-file-input').click()">
+          <svg viewBox="0 0 24 24" class="img-drop-icon"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3"/></svg>
+          <div class="img-drop-text">ここにドラッグ＆ドロップ</div>
+          <div class="img-drop-sub">または クリックして選択（複数枚可）</div>
+          <input id="img-file-input" type="file" accept="image/*" multiple style="display:none">
         </div>
         <div class="m-row">
           <label class="m-lbl">キャプション（任意）</label>
@@ -330,7 +335,7 @@
         </div>
       </div>
       <div id="img-max-reached" style="display:none">
-        <div class="img-max-msg">最大5枚に達しています</div>
+        <div class="img-max-msg">最大10枚に達しています</div>
         <div class="m-actions">
           <button class="btn-cancel" onclick="closeModal('img-modal')">閉じる</button>
         </div>

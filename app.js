@@ -985,23 +985,75 @@ function validateImgFile(file) {
 }
 
 function saveImg() {
-  var file    = document.getElementById('img-file-input').files[0];
-  var caption = document.getElementById('img-caption-input').value.trim();
-  var imgs    = normalizeImages(itemsData[imgTargetSlug]);
-
-  if (!file) { showToast('画像ファイルを選択してください'); return; }
-  if (imgs.length >= 10) { showToast('画像は最大10枚までです'); return; }
-  var err = validateImgFile(file);
-  if (err) { showToast(err); return; }
-
-  var progress = document.getElementById('img-upload-progress');
-  progress.textContent = 'アップロード中...';
-  progress.classList.add('show');
-  document.getElementById('img-save-btn').disabled = true;
-  uploadImgFile(file, caption, imgs.length);
+  var files = Array.from(document.getElementById('img-file-input').files);
+  if (files.length === 0) { showToast('画像ファイルを選択してください'); return; }
+  uploadImgQueue(files);
 }
 
-function uploadImgFile(file, caption, order) {
+function uploadImgQueue(files) {
+  var imgs = normalizeImages(itemsData[imgTargetSlug]);
+  var remaining = 10 - imgs.length;
+  if (remaining <= 0) { showToast('画像は最大10枚までです'); return; }
+
+  var toUpload = files.slice(0, remaining);
+  if (files.length > remaining) showToast((files.length - remaining) + '枚は上限のためスキップしました');
+
+  var errors = [];
+  toUpload = toUpload.filter(function(f) {
+    var err = validateImgFile(f);
+    if (err) { errors.push(f.name + ': ' + err); return false; }
+    return true;
+  });
+  if (errors.length > 0) showToast(errors[0]);
+  if (toUpload.length === 0) return;
+
+  var caption = document.getElementById('img-caption-input').value.trim();
+  var progress = document.getElementById('img-upload-progress');
+  var baseOrder = imgs.length;
+  var done = 0;
+
+  progress.textContent = 'アップロード中... (0/' + toUpload.length + ')';
+  progress.classList.add('show');
+  document.getElementById('img-save-btn').disabled = true;
+
+  function next(i) {
+    if (i >= toUpload.length) {
+      showToast(toUpload.length + '枚の画像を追加しました');
+      refreshImgModal();
+      return;
+    }
+    uploadImgFile(toUpload[i], caption, baseOrder + i, function() {
+      done++;
+      progress.textContent = 'アップロード中... (' + done + '/' + toUpload.length + ')';
+      next(i + 1);
+    });
+  }
+  next(0);
+}
+
+function setupImgDropZone() {
+  var zone = document.getElementById('img-drop-zone');
+  var input = document.getElementById('img-file-input');
+  if (!zone || !input) return;
+
+  zone.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    zone.classList.add('drag-over');
+  });
+  zone.addEventListener('dragleave', function(e) {
+    if (!zone.contains(e.relatedTarget)) zone.classList.remove('drag-over');
+  });
+  zone.addEventListener('drop', function(e) {
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+    var files = Array.from(e.dataTransfer.files).filter(function(f) {
+      return f.type.startsWith('image/');
+    });
+    if (files.length > 0) uploadImgQueue(files);
+  });
+}
+
+function uploadImgFile(file, caption, order, onDone) {
   var imageId = String(Date.now());
   var ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
   var path = 'item-images/' + imgTargetSlug + '/' + imageId + '.' + ext;
@@ -1013,7 +1065,7 @@ function uploadImgFile(file, caption, order) {
         url:url, path:path, caption:caption||null, order:order, createdAt:Number(imageId)
       });
     })
-    .then(function() { showToast('画像を追加しました'); refreshImgModal(); })
+    .then(function() { if (onDone) onDone(); else { showToast('画像を追加しました'); refreshImgModal(); } })
     .catch(function(err) {
       var progress = document.getElementById('img-upload-progress');
       progress.textContent = 'エラー: ' + (err.message || err);
@@ -1372,4 +1424,5 @@ document.addEventListener('DOMContentLoaded', function() {
   if (areaTab) switchTab('area', areaTab);
   updateAdminUI();
   initApp();
+  setupImgDropZone();
 });
